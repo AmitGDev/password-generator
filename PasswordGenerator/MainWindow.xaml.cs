@@ -53,5 +53,14 @@ namespace PasswordGenerator {
 
       return IntPtr.Zero;
     }
+
+    private void CopyButton_Click(object sender, RoutedEventArgs e) {
+    }
+
+    private void CharacterOptionChanged(object sender, RoutedEventArgs e) {
+    }
+
+    private void GenerateButton_Click(object sender, RoutedEventArgs e) {
+    }
   }
 }
