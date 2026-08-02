@@ -1,0 +1,18 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+  <SolidColorBrush x:Key="AccentBrush"               Color="#0B64F7"/>
+  <SolidColorBrush x:Key="SuccessBrush"               Color="#16A34A"/>
+  <SolidColorBrush x:Key="AmberBrush"                Color="#CA8A04"/>
+  <SolidColorBrush x:Key="ControlBorderBrush"                Color="#CCCCCC"/>
+  <SolidColorBrush x:Key="ControlDisabledBrush"               Color="#E0E0E0"/>
+  <SolidColorBrush x:Key="BackgroundGray"             Color="#F9F9F9"/>
+  <SolidColorBrush x:Key="ControlHoverBrush"                  Color="#F5F5F5"/>
+  <SolidColorBrush x:Key="ControlPressedBrush"                Color="#E8E8E8"/>
+  <SolidColorBrush x:Key="MutedText"                  Color="#888888"/>
+  <SolidColorBrush x:Key="SurfaceBrush"                Color="#FFFFFF"/>
+  <SolidColorBrush x:Key="CardBorderBrush"             Color="#E0E0E0"/>
+  <SolidColorBrush x:Key="CardHeaderBackgroundBrush"   Color="#F5F5F5"/>
+  <SolidColorBrush x:Key="PrimaryTextBrush"            Color="#1A1A1A"/>
+
+</ResourceDictionary>
