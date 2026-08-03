@@ -38,6 +38,22 @@
                 </ControlTemplate>
               </Button.Template>
             </Button>
+            <Popup x:Name="CopyConfirmationPopup" PlacementTarget="{Binding ElementName=CopyButton}"
+                   Placement="Custom"
+                   AllowsTransparency="True" PopupAnimation="Fade" StaysOpen="True">
+              <Border Background="{DynamicResource SurfaceBrush}"
+                      CornerRadius="4" Padding="8,4">
+                <Border.Effect>
+                  <DropShadowEffect BlurRadius="6" ShadowDepth="1" Opacity="0.2"/>
+                </Border.Effect>
+                <StackPanel Orientation="Horizontal">
+                  <TextBlock Text="&#xE930;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="12"
+                             Foreground="{DynamicResource SuccessBrush}" VerticalAlignment="Center"/>
+                  <TextBlock Text="Copied" FontSize="11" Margin="4,0,0,0" VerticalAlignment="Center"
+                             Foreground="{DynamicResource SuccessBrush}"/>
+                </StackPanel>
+              </Border>
+            </Popup>
           </Grid>
           <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
             <TextBlock Text="Entropy" Style="{StaticResource TextLabel}" Width="90"/>

@@ -1,16 +1,34 @@
 ﻿using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Interop;
+using System.Windows.Threading;
 
 namespace PasswordGenerator {
   /// <summary>
   /// Interaction logic for MainWindow.xaml
   /// </summary>
   public partial class MainWindow : Window {
+    // Auto-dismisses the "Copied" confirmation toast 2 seconds after a copy.
+    private readonly DispatcherTimer _copyConfirmationTimer = new() { Interval = TimeSpan.FromSeconds(2) };
+
     public MainWindow() {
       InitializeComponent();
+      _copyConfirmationTimer.Tick += CopyConfirmationTimer_Tick;
+      CopyConfirmationPopup.CustomPopupPlacementCallback = GetCopyConfirmationPlacement;
+    }
+
+    // Vertically centers the "Copied" toast against CopyButton's actual
+    // height and sits it just to the left, using the popup's real measured
+    // size rather than a guessed fixed offset - stays correct regardless of
+    // font metrics or future content changes, unlike a hardcoded VerticalOffset.
+    private static CustomPopupPlacement[] GetCopyConfirmationPlacement(Size popupSize, Size targetSize, Point offset) {
+      const double gap = 4;
+      var x = -popupSize.Width - gap;
+      var y = (targetSize.Height - popupSize.Height) / 2;
+      return new[] { new CustomPopupPlacement(new Point(x, y), PopupPrimaryAxis.None) };
     }
 
     private const int WM_SETTINGCHANGE = 0x001A;
@@ -55,12 +73,34 @@ namespace PasswordGenerator {
     }
 
     private void CopyButton_Click(object sender, RoutedEventArgs e) {
+      // TODO: write PasswordTextBox.Text to the clipboard here once the
+      // generator model exists.
+      ShowCopyConfirmation();
+    }
+
+    private void ShowCopyConfirmation() {
+      // Stop-then-start rather than just Start, so a repeated copy while
+      // the toast is already showing resets it to a fresh 2 seconds
+      // instead of letting an earlier timer close it early.
+      _copyConfirmationTimer.Stop();
+      CopyConfirmationPopup.IsOpen = true;
+      _copyConfirmationTimer.Start();
+    }
+
+    private void CopyConfirmationTimer_Tick(object? sender, EventArgs e) {
+      _copyConfirmationTimer.Stop();
+      CopyConfirmationPopup.IsOpen = false;
     }
 
     private void CharacterOptionChanged(object sender, RoutedEventArgs e) {
     }
 
     private void GenerateButton_Click(object sender, RoutedEventArgs e) {
+      // TODO: call the generator model and write the result into
+      // PasswordTextBox here once it exists.
+      if (AutoCopyCheckBox.IsChecked == true) {
+        ShowCopyConfirmation();
+      }
     }
   }
 }
