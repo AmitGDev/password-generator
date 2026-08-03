@@ -75,7 +75,23 @@
         </Border>
         <StackPanel Style="{StaticResource CardContent}">
           <TextBox x:Name="LengthTextBox" Width="56" Padding="4,6" TextAlignment="Center" HorizontalAlignment="Left"
-                   Text="16"/>
+                   Text="16" TextChanged="LengthTextBox_TextChanged"
+                   MouseEnter="LengthHoverArea_MouseEnter" MouseLeave="LengthHoverArea_MouseLeave"/>
+
+          <Popup x:Name="LengthSliderPopup" PlacementTarget="{Binding ElementName=LengthTextBox}"
+                 Placement="Bottom" HorizontalOffset="-75" VerticalOffset="4"
+                 AllowsTransparency="True" PopupAnimation="Fade" StaysOpen="True">
+            <Border Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource ControlBorderBrush}" BorderThickness="1"
+                    CornerRadius="6" Padding="12,10"
+                    MouseEnter="LengthHoverArea_MouseEnter" MouseLeave="LengthHoverArea_MouseLeave">
+              <Border.Effect>
+                <DropShadowEffect BlurRadius="8" ShadowDepth="1" Opacity="0.2"/>
+              </Border.Effect>
+              <Slider x:Name="LengthSlider" Width="180" Minimum="4" Maximum="128" Value="16"
+                      IsSnapToTickEnabled="True" TickFrequency="1"
+                      ValueChanged="LengthSlider_ValueChanged"/>
+            </Border>
+          </Popup>
         </StackPanel>
       </StackPanel>
     </Border>

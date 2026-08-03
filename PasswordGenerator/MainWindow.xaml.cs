@@ -11,11 +11,21 @@ namespace PasswordGenerator {
   /// Interaction logic for MainWindow.xaml
   /// </summary>
   public partial class MainWindow : Window {
+    // Guards against the slider and textbox re-entrantly overwriting each
+    // other when one updates the other in response to a user edit.
+    private bool _isSyncingLength;
+
+    // Keeps the length popup slider open for a short grace period after the
+    // mouse leaves the textbox or the popup, so moving between the two
+    // (or briefly overshooting either) doesn't snap it shut.
+    private readonly DispatcherTimer _lengthPopupCloseTimer = new() { Interval = TimeSpan.FromMilliseconds(250) };
+
     // Auto-dismisses the "Copied" confirmation toast 2 seconds after a copy.
     private readonly DispatcherTimer _copyConfirmationTimer = new() { Interval = TimeSpan.FromSeconds(2) };
 
     public MainWindow() {
       InitializeComponent();
+      _lengthPopupCloseTimer.Tick += LengthPopupCloseTimer_Tick;
       _copyConfirmationTimer.Tick += CopyConfirmationTimer_Tick;
       CopyConfirmationPopup.CustomPopupPlacementCallback = GetCopyConfirmationPlacement;
     }
@@ -93,6 +103,53 @@ namespace PasswordGenerator {
     }
 
     private void CharacterOptionChanged(object sender, RoutedEventArgs e) {
+    }
+
+    private void LengthHoverArea_MouseEnter(object sender, MouseEventArgs e) {
+      _lengthPopupCloseTimer.Stop();
+      LengthSliderPopup.IsOpen = true;
+    }
+
+    private void LengthHoverArea_MouseLeave(object sender, MouseEventArgs e) {
+      _lengthPopupCloseTimer.Stop();
+      _lengthPopupCloseTimer.Start();
+    }
+
+    private void LengthPopupCloseTimer_Tick(object? sender, EventArgs e) {
+      _lengthPopupCloseTimer.Stop();
+      LengthSliderPopup.IsOpen = false;
+    }
+
+    private void LengthSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e) {
+      if (_isSyncingLength) {
+        return;
+      }
+
+      _isSyncingLength = true;
+      LengthTextBox.Text = ((int)e.NewValue).ToString();
+      _isSyncingLength = false;
+    }
+
+    private void LengthTextBox_TextChanged(object sender, TextChangedEventArgs e) {
+      // LengthTextBox is parsed before LengthSlider in the XAML, so setting
+      // its initial Text during InitializeComponent fires this handler
+      // before LengthSlider's field has been assigned. Bail out until the
+      // rest of the window is wired up.
+      if (LengthSlider is null || _isSyncingLength) {
+        return;
+      }
+
+      if (!int.TryParse(LengthTextBox.Text, out var length)) {
+        return;
+      }
+
+      // Clamp silently rather than rejecting keystrokes, so typing a
+      // multi-digit number doesn't fight the user character by character.
+      var clamped = Math.Clamp(length, (int)LengthSlider.Minimum, (int)LengthSlider.Maximum);
+
+      _isSyncingLength = true;
+      LengthSlider.Value = clamped;
+      _isSyncingLength = false;
     }
 
     private void GenerateButton_Click(object sender, RoutedEventArgs e) {
