@@ -28,6 +28,8 @@ namespace PasswordGenerator {
       _lengthPopupCloseTimer.Tick += LengthPopupCloseTimer_Tick;
       _copyConfirmationTimer.Tick += CopyConfirmationTimer_Tick;
       CopyConfirmationPopup.CustomPopupPlacementCallback = GetCopyConfirmationPlacement;
+      UpdatePoolSizeDisplay();
+      GeneratePassword();
     }
 
     // Vertically centers the "Copied" toast against CopyButton's actual
@@ -82,9 +84,14 @@ namespace PasswordGenerator {
       return IntPtr.Zero;
     }
 
-    private void CopyButton_Click(object sender, RoutedEventArgs e) {
-      // TODO: write PasswordTextBox.Text to the clipboard here once the
-      // generator model exists.
+    private void CopyButton_Click(object sender, RoutedEventArgs e) => CopyPasswordToClipboard();
+
+    private void CopyPasswordToClipboard() {
+      if (string.IsNullOrEmpty(PasswordTextBox.Text)) {
+        return;
+      }
+
+      Clipboard.SetText(PasswordTextBox.Text);
       ShowCopyConfirmation();
     }
 
@@ -102,7 +109,28 @@ namespace PasswordGenerator {
       CopyConfirmationPopup.IsOpen = false;
     }
 
-    private void CharacterOptionChanged(object sender, RoutedEventArgs e) {
+    private void CharacterOptionChanged(object sender, RoutedEventArgs e) => UpdatePoolSizeDisplay();
+
+    private void UpdatePoolSizeDisplay() {
+      // Fires as each checkbox's default IsChecked is applied during
+      // InitializeComponent, potentially before later checkboxes and the
+      // PoolSizeTextBlock field are assigned yet. Bail out until the rest
+      // of the window is wired up - the explicit call at the end of the
+      // constructor triggers the first real update.
+      if (UppercaseCheckBox is null || LowercaseCheckBox is null || DigitsCheckBox is null
+          || SymbolsCheckBox is null || ExcludeAmbiguousCheckBox is null || PoolSizeTextBlock is null) {
+        return;
+      }
+
+      var poolSize = CryptoPasswordGenerator.GetPoolSize(new PasswordOptions {
+        IncludeUppercase = UppercaseCheckBox.IsChecked == true,
+        IncludeLowercase = LowercaseCheckBox.IsChecked == true,
+        IncludeDigits = DigitsCheckBox.IsChecked == true,
+        IncludeSymbols = SymbolsCheckBox.IsChecked == true,
+        ExcludeAmbiguous = ExcludeAmbiguousCheckBox.IsChecked == true,
+      });
+
+      PoolSizeTextBlock.Text = poolSize.ToString();
     }
 
     private void LengthHoverArea_MouseEnter(object sender, MouseEventArgs e) {
@@ -152,12 +180,55 @@ namespace PasswordGenerator {
       _isSyncingLength = false;
     }
 
-    private void GenerateButton_Click(object sender, RoutedEventArgs e) {
-      // TODO: call the generator model and write the result into
-      // PasswordTextBox here once it exists.
-      if (AutoCopyCheckBox.IsChecked == true) {
-        ShowCopyConfirmation();
+    private void GenerateButton_Click(object sender, RoutedEventArgs e) => GeneratePassword();
+
+    private void GeneratePassword() {
+      var options = new PasswordOptions {
+        Length = (int)LengthSlider.Value,
+        IncludeUppercase = UppercaseCheckBox.IsChecked == true,
+        IncludeLowercase = LowercaseCheckBox.IsChecked == true,
+        IncludeDigits = DigitsCheckBox.IsChecked == true,
+        IncludeSymbols = SymbolsCheckBox.IsChecked == true,
+        ExcludeAmbiguous = ExcludeAmbiguousCheckBox.IsChecked == true,
+      };
+
+      try {
+        PasswordTextBox.Text = CryptoPasswordGenerator.Generate(options);
+
+        if (AutoCopyCheckBox.IsChecked == true) {
+          CopyPasswordToClipboard();
+        }
+
+        // Computed from the same options used for Generate() above, so
+        // these always describe the password actually shown - not a
+        // live preview that could drift from it if options change
+        // afterward without a re-generate.
+        var bits = CryptoPasswordGenerator.GetMaximumEntropyBits(options);
+        var poolSize = CryptoPasswordGenerator.GetPoolSize(options);
+        EntropyTextBlock.Text = $"{bits:F1} bits";
+        SearchSpaceTextBlock.Text = $"{poolSize}^{options.Length} {FormatSearchSpace(bits)}";
+      } catch (PasswordOptionsException ex) {
+        PasswordTextBox.Text = string.Empty;
+        EntropyTextBlock.Text = string.Empty;
+        SearchSpaceTextBlock.Text = string.Empty;
+        MessageBox.Show(ex.Message, "Cannot generate password", MessageBoxButton.OK, MessageBoxImage.Warning);
       }
+    }
+
+    // Formats the search space (2^entropyBits) as "≈ mantissa × 10^exponent
+    // combinations". The raw number is too large to be meaningful in full
+    // for any realistic password length, so this expresses it at a scale a
+    // person can actually take in. Deliberately not a time-to-crack
+    // estimate - that would require assuming an attacker's guesses-per-
+    // second, which this app has no basis to claim. A display-formatting
+    // concern, so it lives here rather than in CryptoPasswordGenerator,
+    // which stays limited to generation math with no UI dependency.
+    private static string FormatSearchSpace(double entropyBits) {
+      var log10 = entropyBits * Math.Log10(2);
+      var exponent = (int)Math.Floor(log10);
+      var mantissa = Math.Pow(10, log10 - exponent);
+
+      return $"≈ {mantissa:F1} × 10^{exponent} combinations";
     }
   }
 }
