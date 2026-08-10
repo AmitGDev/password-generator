@@ -8,14 +8,15 @@
         ResizeMode="CanMinimize"
         WindowStartupLocation="CenterScreen"
         Background="{DynamicResource BackgroundGray}">
-  
+
   <StackPanel Margin="16">
 
-    <!-- Result card -->
+    <!-- Result card - shared chrome; content is swapped in code-behind to whichever
+         mode's last-generated value matches the active tab, not tied to the tab itself -->
     <Border Style="{StaticResource CardBorder}" Background="{DynamicResource SurfaceBrush}">
       <StackPanel>
         <Border Style="{StaticResource CardHeader}">
-          <TextBlock Text="Generated Password" Style="{StaticResource CardHeaderText}"/>
+          <TextBlock x:Name="ResultHeaderText" Text="Generated Password" Style="{StaticResource CardHeaderText}"/>
         </Border>
         <StackPanel Style="{StaticResource CardContent}">
           <Grid>
@@ -38,6 +39,8 @@
                 </ControlTemplate>
               </Button.Template>
             </Button>
+            <!-- Real-time confirmation only; not a claim about current clipboard contents.
+                 Dismissed early on tab switch or a fresh Generate, see code-behind. -->
             <Popup x:Name="CopyConfirmationPopup" PlacementTarget="{Binding ElementName=CopyButton}"
                    Placement="Custom"
                    AllowsTransparency="True" PopupAnimation="Fade" StaysOpen="True">
@@ -67,61 +70,153 @@
       </StackPanel>
     </Border>
 
-    <!-- Length card -->
-    <Border Style="{StaticResource CardBorder}" Background="{DynamicResource SurfaceBrush}">
-      <StackPanel>
-        <Border Style="{StaticResource CardHeader}">
-          <TextBlock Text="Length" Style="{StaticResource CardHeaderText}"/>
-        </Border>
-        <StackPanel Style="{StaticResource CardContent}">
-          <TextBox x:Name="LengthTextBox" Width="56" Padding="4,6" TextAlignment="Center" HorizontalAlignment="Left"
-                   Text="16" TextChanged="LengthTextBox_TextChanged"
-                   MouseEnter="LengthHoverArea_MouseEnter" MouseLeave="LengthHoverArea_MouseLeave"/>
+    <!-- Mode tabs - only the options panel swaps; Result card, Generation card and
+         Generate button above/below stay mounted once -->
+    <TabControl x:Name="ModeTabControl" Margin="0,0,0,16">
 
-          <Popup x:Name="LengthSliderPopup" PlacementTarget="{Binding ElementName=LengthTextBox}"
-                 Placement="Bottom" HorizontalOffset="-75" VerticalOffset="4"
-                 AllowsTransparency="True" PopupAnimation="Fade" StaysOpen="True">
-            <Border Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource ControlBorderBrush}" BorderThickness="1"
-                    CornerRadius="6" Padding="12,10"
-                    MouseEnter="LengthHoverArea_MouseEnter" MouseLeave="LengthHoverArea_MouseLeave">
-              <Border.Effect>
-                <DropShadowEffect BlurRadius="8" ShadowDepth="1" Opacity="0.2"/>
-              </Border.Effect>
-              <Slider x:Name="LengthSlider" Width="180" Minimum="4" Maximum="128" Value="16"
-                      IsSnapToTickEnabled="True" TickFrequency="1"
-                      ValueChanged="LengthSlider_ValueChanged"/>
-            </Border>
-          </Popup>
+      <TabItem Header="Password">
+        <StackPanel Margin="0,12,0,0">
+
+          <!-- Length card -->
+          <Border Style="{StaticResource CardBorder}" Background="{DynamicResource SurfaceBrush}">
+            <StackPanel>
+              <Border Style="{StaticResource CardHeader}">
+                <TextBlock Text="Length" Style="{StaticResource CardHeaderText}"/>
+              </Border>
+              <StackPanel Style="{StaticResource CardContent}">
+                <TextBox x:Name="LengthTextBox" Width="56" Padding="4,6" TextAlignment="Center" HorizontalAlignment="Left"
+                         Text="16" TextChanged="LengthTextBox_TextChanged"
+                         MouseEnter="LengthHoverArea_MouseEnter" MouseLeave="LengthHoverArea_MouseLeave"/>
+
+                <Popup x:Name="LengthSliderPopup" PlacementTarget="{Binding ElementName=LengthTextBox}"
+                       Placement="Bottom" HorizontalOffset="-75" VerticalOffset="4"
+                       AllowsTransparency="True" PopupAnimation="Fade" StaysOpen="True">
+                  <Border Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource ControlBorderBrush}" BorderThickness="1"
+                          CornerRadius="6" Padding="12,10"
+                          MouseEnter="LengthHoverArea_MouseEnter" MouseLeave="LengthHoverArea_MouseLeave">
+                    <Border.Effect>
+                      <DropShadowEffect BlurRadius="8" ShadowDepth="1" Opacity="0.2"/>
+                    </Border.Effect>
+                    <Slider x:Name="LengthSlider" Width="180" Minimum="4" Maximum="128" Value="16"
+                            IsSnapToTickEnabled="True" TickFrequency="1"
+                            ValueChanged="LengthSlider_ValueChanged"/>
+                  </Border>
+                </Popup>
+              </StackPanel>
+            </StackPanel>
+          </Border>
+
+          <!-- Character types card - answers "what characters may appear?" -->
+          <Border Style="{StaticResource CardBorder}" Background="{DynamicResource SurfaceBrush}" Margin="0,12,0,0">
+            <StackPanel>
+              <Border Style="{StaticResource CardHeader}">
+                <TextBlock Text="Character types" Style="{StaticResource CardHeaderText}"/>
+              </Border>
+              <StackPanel Style="{StaticResource CardContent}">
+                <CheckBox x:Name="UppercaseCheckBox" Content="Uppercase (A-Z)" IsChecked="True" Margin="0,4"
+                          Checked="CharacterOptionChanged" Unchecked="CharacterOptionChanged"/>
+                <CheckBox x:Name="LowercaseCheckBox" Content="Lowercase (a-z)" IsChecked="True" Margin="0,4"
+                          Checked="CharacterOptionChanged" Unchecked="CharacterOptionChanged"/>
+                <CheckBox x:Name="DigitsCheckBox" Content="Digits (0-9)" IsChecked="True" Margin="0,4"
+                          Checked="CharacterOptionChanged" Unchecked="CharacterOptionChanged"/>
+                <CheckBox x:Name="SymbolsCheckBox" Content="Symbols (!@#$...)" IsChecked="True" Margin="0,4"
+                          Checked="CharacterOptionChanged" Unchecked="CharacterOptionChanged"/>
+                <CheckBox x:Name="ExcludeAmbiguousCheckBox" Content="Exclude ambiguous characters (l, 1, I, O, 0)" Margin="0,4"
+                          Checked="CharacterOptionChanged" Unchecked="CharacterOptionChanged"/>
+                <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                  <TextBlock Text="Pool size" Style="{StaticResource TextLabel}" Width="90"/>
+                  <TextBlock x:Name="PoolSizeTextBlock" Style="{StaticResource TextContent}" Margin="6,0,0,0"/>
+                </StackPanel>
+              </StackPanel>
+            </StackPanel>
+          </Border>
+
         </StackPanel>
-      </StackPanel>
-    </Border>
+      </TabItem>
 
-    <!-- Character types card - answers "what characters may appear?" -->
-    <Border Style="{StaticResource CardBorder}" Background="{DynamicResource SurfaceBrush}">
-      <StackPanel>
-        <Border Style="{StaticResource CardHeader}">
-          <TextBlock Text="Character types" Style="{StaticResource CardHeaderText}"/>
-        </Border>
-        <StackPanel Style="{StaticResource CardContent}">
-          <CheckBox x:Name="UppercaseCheckBox" Content="Uppercase (A-Z)" IsChecked="True" Margin="0,4"
-                    Checked="CharacterOptionChanged" Unchecked="CharacterOptionChanged"/>
-          <CheckBox x:Name="LowercaseCheckBox" Content="Lowercase (a-z)" IsChecked="True" Margin="0,4"
-                    Checked="CharacterOptionChanged" Unchecked="CharacterOptionChanged"/>
-          <CheckBox x:Name="DigitsCheckBox" Content="Digits (0-9)" IsChecked="True" Margin="0,4"
-                    Checked="CharacterOptionChanged" Unchecked="CharacterOptionChanged"/>
-          <CheckBox x:Name="SymbolsCheckBox" Content="Symbols (!@#$...)" IsChecked="True" Margin="0,4"
-                    Checked="CharacterOptionChanged" Unchecked="CharacterOptionChanged"/>
-          <CheckBox x:Name="ExcludeAmbiguousCheckBox" Content="Exclude ambiguous characters (l, 1, I, O, 0)" Margin="0,4"
-                    Checked="CharacterOptionChanged" Unchecked="CharacterOptionChanged"/>
-          <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
-            <TextBlock Text="Pool size" Style="{StaticResource TextLabel}" Width="90"/>
-            <TextBlock x:Name="PoolSizeTextBlock" Style="{StaticResource TextContent}" Margin="6,0,0,0"/>
-          </StackPanel>
+      <TabItem Header="Passphrase">
+        <StackPanel Margin="0,12,0,0">
+
+          <!-- Word count card - passphrase equivalent of the Length card -->
+          <Border Style="{StaticResource CardBorder}" Background="{DynamicResource SurfaceBrush}">
+            <StackPanel>
+              <Border Style="{StaticResource CardHeader}">
+                <TextBlock Text="Word count" Style="{StaticResource CardHeaderText}"/>
+              </Border>
+              <StackPanel Style="{StaticResource CardContent}">
+                <Grid>
+                  <TextBox x:Name="WordCountTextBox" Width="56" Padding="4,6" TextAlignment="Center" HorizontalAlignment="Left"
+                           Text="5" TextChanged="WordCountTextBox_TextChanged"
+                           MouseEnter="WordCountHoverArea_MouseEnter" MouseLeave="WordCountHoverArea_MouseLeave"/>
+
+                  <Popup x:Name="WordCountSliderPopup" PlacementTarget="{Binding ElementName=WordCountTextBox}"
+                         Placement="Bottom" HorizontalOffset="-75" VerticalOffset="4"
+                         AllowsTransparency="True" PopupAnimation="Fade" StaysOpen="True">
+                    <Border Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource ControlBorderBrush}" BorderThickness="1"
+                            CornerRadius="6" Padding="12,10"
+                            MouseEnter="WordCountHoverArea_MouseEnter" MouseLeave="WordCountHoverArea_MouseLeave">
+                      <Border.Effect>
+                        <DropShadowEffect BlurRadius="8" ShadowDepth="1" Opacity="0.2"/>
+                      </Border.Effect>
+                      <Slider x:Name="WordCountSlider" Width="180" Minimum="3" Maximum="12" Value="5"
+                              IsSnapToTickEnabled="True" TickFrequency="1"
+                              ValueChanged="WordCountSlider_ValueChanged"/>
+                    </Border>
+                  </Popup>
+                </Grid>
+              </StackPanel>
+            </StackPanel>
+          </Border>
+
+          <!-- Word style card - passphrase equivalent of the Character types card:
+               answers "how are the words chosen, cased and joined?" -->
+          <Border Style="{StaticResource CardBorder}" Background="{DynamicResource SurfaceBrush}" Margin="0,12,0,0">
+            <StackPanel>
+              <Border Style="{StaticResource CardHeader}">
+                <TextBlock Text="Word style" Style="{StaticResource CardHeaderText}"/>
+              </Border>
+              <StackPanel Style="{StaticResource CardContent}">
+
+                <StackPanel Orientation="Horizontal" Margin="0,4">
+                  <TextBlock Text="Separator" Style="{StaticResource TextLabel}" Width="90" VerticalAlignment="Center"/>
+                  <ComboBox x:Name="SeparatorComboBox" Width="120" SelectedIndex="0"
+                            SelectionChanged="PassphraseOptionChanged">
+                    <ComboBoxItem Content="Hyphen (-)"/>
+                    <ComboBoxItem Content="Underscore (_)"/>
+                    <ComboBoxItem Content="None"/>
+                  </ComboBox>
+                </StackPanel>
+
+                <StackPanel Orientation="Horizontal" Margin="0,4">
+                  <TextBlock Text="Capitalization" Style="{StaticResource TextLabel}" Width="90" VerticalAlignment="Center"/>
+                  <ComboBox x:Name="CapitalizationComboBox" Width="120" SelectedIndex="0"
+                            SelectionChanged="PassphraseOptionChanged">
+                    <ComboBoxItem Content="None"/>
+                    <ComboBoxItem Content="Title case"/>
+                    <ComboBoxItem Content="Random per word"/>
+                  </ComboBox>
+                </StackPanel>
+
+                <CheckBox x:Name="AppendNumberCheckBox" Content="Append a random number" Margin="0,8,0,4"
+                          Checked="PassphraseOptionChanged" Unchecked="PassphraseOptionChanged"/>
+                <CheckBox x:Name="AddSymbolCheckBox" Content="Insert a symbol between words" Margin="0,4"
+                          Checked="PassphraseOptionChanged" Unchecked="PassphraseOptionChanged"/>
+
+                <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                  <TextBlock Text="Wordlist size" Style="{StaticResource TextLabel}" Width="90"/>
+                  <TextBlock x:Name="WordlistSizeTextBlock" Style="{StaticResource TextContent}" Margin="6,0,0,0"/>
+                </StackPanel>
+
+              </StackPanel>
+            </StackPanel>
+          </Border>
+
         </StackPanel>
-      </StackPanel>
-    </Border>
+      </TabItem>
 
-    <!-- Generation card - answers "how should the generator behave?" -->
+    </TabControl>
+
+    <!-- Generation card - shared; applies regardless of mode -->
     <Border Style="{StaticResource CardBorder}" Background="{DynamicResource SurfaceBrush}" Margin="0,0,0,16">
       <StackPanel>
         <Border Style="{StaticResource CardHeader}">
@@ -133,7 +228,7 @@
       </StackPanel>
     </Border>
 
-    <!-- Action -->
+    <!-- Action - shared; acts on whichever tab is active -->
     <Button x:Name="GenerateButton" Content="Generate" Width="130" Padding="0,8"
             HorizontalAlignment="Right" IsDefault="True" Click="GenerateButton_Click"/>
 

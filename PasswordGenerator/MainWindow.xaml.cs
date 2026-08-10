@@ -1,4 +1,4 @@
-﻿using System.Runtime.InteropServices;
+using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
@@ -23,9 +23,16 @@ namespace PasswordGenerator {
     // Auto-dismisses the "Copied" confirmation toast 2 seconds after a copy.
     private readonly DispatcherTimer _copyConfirmationTimer = new() { Interval = TimeSpan.FromSeconds(2) };
 
+    // Same sync-guard and hover-grace pattern as length, mirrored for the
+    // passphrase word-count control. Layout-only for now - nothing reads
+    // WordCountSlider.Value yet.
+    private bool _isSyncingWordCount;
+    private readonly DispatcherTimer _wordCountPopupCloseTimer = new() { Interval = TimeSpan.FromMilliseconds(250) };
+
     public MainWindow() {
       InitializeComponent();
       _lengthPopupCloseTimer.Tick += LengthPopupCloseTimer_Tick;
+      _wordCountPopupCloseTimer.Tick += WordCountPopupCloseTimer_Tick;
       _copyConfirmationTimer.Tick += CopyConfirmationTimer_Tick;
       CopyConfirmationPopup.CustomPopupPlacementCallback = GetCopyConfirmationPlacement;
       UpdatePoolSizeDisplay();
@@ -178,6 +185,62 @@ namespace PasswordGenerator {
       _isSyncingLength = true;
       LengthSlider.Value = clamped;
       _isSyncingLength = false;
+    }
+
+    // Mirrors LengthHoverArea_MouseEnter/Leave and LengthSlider_ValueChanged/
+    // LengthTextBox_TextChanged above, for the passphrase Word count card.
+    // Layout-only: keeps the floating slider control working the same way
+    // as Length, with nothing yet reading WordCountSlider.Value.
+    private void WordCountHoverArea_MouseEnter(object sender, MouseEventArgs e) {
+      _wordCountPopupCloseTimer.Stop();
+      WordCountSliderPopup.IsOpen = true;
+    }
+
+    private void WordCountHoverArea_MouseLeave(object sender, MouseEventArgs e) {
+      _wordCountPopupCloseTimer.Stop();
+      _wordCountPopupCloseTimer.Start();
+    }
+
+    private void WordCountPopupCloseTimer_Tick(object? sender, EventArgs e) {
+      _wordCountPopupCloseTimer.Stop();
+      WordCountSliderPopup.IsOpen = false;
+    }
+
+    private void WordCountSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e) {
+      if (_isSyncingWordCount) {
+        return;
+      }
+
+      _isSyncingWordCount = true;
+      WordCountTextBox.Text = ((int)e.NewValue).ToString();
+      _isSyncingWordCount = false;
+    }
+
+    private void WordCountTextBox_TextChanged(object sender, TextChangedEventArgs e) {
+      // Same InitializeComponent ordering caveat as LengthTextBox_TextChanged.
+      if (WordCountSlider is null || _isSyncingWordCount) {
+        return;
+      }
+
+      if (!int.TryParse(WordCountTextBox.Text, out var wordCount)) {
+        return;
+      }
+
+      var clamped = Math.Clamp(wordCount, (int)WordCountSlider.Minimum, (int)WordCountSlider.Maximum);
+
+      _isSyncingWordCount = true;
+      WordCountSlider.Value = clamped;
+      _isSyncingWordCount = false;
+    }
+
+    // TODO: implement passphrase generation (word source, separator,
+    // capitalization, appended number/symbol). Exists only so the
+    // Passphrase tab's ComboBoxes and CheckBoxes have a handler to bind to
+    // at this layout-only stage - both overloads are intentionally empty.
+    private void PassphraseOptionChanged(object sender, RoutedEventArgs e) {
+    }
+
+    private void PassphraseOptionChanged(object sender, SelectionChangedEventArgs e) {
     }
 
     private void GenerateButton_Click(object sender, RoutedEventArgs e) => GeneratePassword();
