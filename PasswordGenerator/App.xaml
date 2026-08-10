@@ -8,6 +8,7 @@
       <ResourceDictionary.MergedDictionaries>
         <ResourceDictionary Source="Resources/Styles.Controls.xaml"/>
         <ResourceDictionary Source="Resources/Styles.Cards.xaml"/>
+        <ResourceDictionary Source="Resources/Styles.Tabs.xaml"/>
         <ResourceDictionary Source="Resources/Styles.Text.xaml"/>
         <ResourceDictionary Source="Resources/Styles.TextBox.xaml"/>
       </ResourceDictionary.MergedDictionaries>
