@@ -72,9 +72,9 @@
 
     <!-- Mode tabs - only the options panel swaps; Result card, Generation card and
          Generate button above/below stay mounted once -->
-    <TabControl x:Name="ModeTabControl" Margin="0,0,0,16">
+    <TabControl x:Name="ModeTabControl" Margin="0,0,0,16" SelectionChanged="ModeTabControl_SelectionChanged">
 
-      <TabItem Header="Password">
+      <TabItem x:Name="PasswordTabItem" Header="Password">
         <StackPanel Margin="0,12,0,0">
 
           <!-- Length card -->
@@ -134,7 +134,7 @@
         </StackPanel>
       </TabItem>
 
-      <TabItem Header="Passphrase">
+      <TabItem x:Name="PassphraseTabItem" Header="Passphrase">
         <StackPanel Margin="0,12,0,0">
 
           <!-- Word count card - passphrase equivalent of the Length card -->
@@ -179,27 +179,49 @@
 
                 <StackPanel Orientation="Horizontal" Margin="0,4">
                   <TextBlock Text="Separator" Style="{StaticResource TextLabel}" Width="90" VerticalAlignment="Center"/>
-                  <ComboBox x:Name="SeparatorComboBox" Width="120" SelectedIndex="0"
-                            SelectionChanged="PassphraseOptionChanged">
-                    <ComboBoxItem Content="Hyphen (-)"/>
-                    <ComboBoxItem Content="Underscore (_)"/>
-                    <ComboBoxItem Content="None"/>
-                  </ComboBox>
+                  <RadioButton x:Name="SeparatorOffRadio" Content="Off" GroupName="SeparatorGroup" Margin="0,0,10,0" VerticalAlignment="Center"
+                               Checked="SeparatorOptionChanged"/>
+                  <RadioButton x:Name="SeparatorCustomRadio" Content="Character:" GroupName="SeparatorGroup" IsChecked="True" VerticalAlignment="Center"
+                               Checked="SeparatorOptionChanged"/>
+                  <Grid Margin="6,0,0,0">
+                    <TextBox x:Name="CustomSeparatorTextBox" Width="56" Padding="4,6" TextAlignment="Center"
+                             MaxLength="6" Text="-"
+                             MouseEnter="CustomSeparatorHoverArea_MouseEnter" MouseLeave="CustomSeparatorHoverArea_MouseLeave"/>
+
+                    <Popup x:Name="CustomSeparatorSliderPopup" PlacementTarget="{Binding ElementName=CustomSeparatorTextBox}"
+                           Placement="Bottom" HorizontalOffset="-75" VerticalOffset="4"
+                           AllowsTransparency="True" PopupAnimation="Fade" StaysOpen="True">
+                      <Border Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource ControlBorderBrush}" BorderThickness="1"
+                              CornerRadius="6" Padding="12,10"
+                              MouseEnter="CustomSeparatorHoverArea_MouseEnter" MouseLeave="CustomSeparatorHoverArea_MouseLeave">
+                        <Border.Effect>
+                          <DropShadowEffect BlurRadius="8" ShadowDepth="1" Opacity="0.2"/>
+                        </Border.Effect>
+                        <!-- Quick-pick convenience only: dragging writes a symbol into
+                             CustomSeparatorTextBox, but typing there doesn't move this back -
+                             unlike Length/WordCount, the text field isn't restricted to what
+                             the slider can express, so there's no single value to mirror.
+                             Hyphen and underscore are back in this pool now that they no
+                             longer have their own dedicated radio buttons. -->
+                        <Slider x:Name="CustomSeparatorSlider" Width="140" Minimum="0" Maximum="11"
+                                IsSnapToTickEnabled="True" TickFrequency="1"
+                                ValueChanged="CustomSeparatorSlider_ValueChanged"/>
+                      </Border>
+                    </Popup>
+                  </Grid>
                 </StackPanel>
 
-                <StackPanel Orientation="Horizontal" Margin="0,4">
+                <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
                   <TextBlock Text="Capitalization" Style="{StaticResource TextLabel}" Width="90" VerticalAlignment="Center"/>
-                  <ComboBox x:Name="CapitalizationComboBox" Width="120" SelectedIndex="0"
-                            SelectionChanged="PassphraseOptionChanged">
-                    <ComboBoxItem Content="None"/>
-                    <ComboBoxItem Content="Title case"/>
-                    <ComboBoxItem Content="Random per word"/>
-                  </ComboBox>
+                  <RadioButton x:Name="CapitalizationOffRadio" Content="Off" GroupName="CapitalizationGroup" IsChecked="True" Margin="0,0,10,0" VerticalAlignment="Center"
+                               Checked="PassphraseOptionChanged"/>
+                  <RadioButton x:Name="CapitalizationTitleCaseRadio" Content="Title case" GroupName="CapitalizationGroup" Margin="0,0,10,0" VerticalAlignment="Center"
+                               Checked="PassphraseOptionChanged"/>
+                  <RadioButton x:Name="CapitalizationRandomPerWordRadio" Content="Random per word" GroupName="CapitalizationGroup" VerticalAlignment="Center"
+                               Checked="PassphraseOptionChanged"/>
                 </StackPanel>
 
                 <CheckBox x:Name="AppendNumberCheckBox" Content="Append a random number" Margin="0,8,0,4"
-                          Checked="PassphraseOptionChanged" Unchecked="PassphraseOptionChanged"/>
-                <CheckBox x:Name="AddSymbolCheckBox" Content="Insert a symbol between words" Margin="0,4"
                           Checked="PassphraseOptionChanged" Unchecked="PassphraseOptionChanged"/>
 
                 <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
@@ -210,6 +232,7 @@
               </StackPanel>
             </StackPanel>
           </Border>
+
 
         </StackPanel>
       </TabItem>

@@ -29,14 +29,59 @@ namespace PasswordGenerator {
     private bool _isSyncingWordCount;
     private readonly DispatcherTimer _wordCountPopupCloseTimer = new() { Interval = TimeSpan.FromMilliseconds(250) };
 
+    // Same hover-grace pattern as the Length/WordCount popups, for the
+    // custom-separator symbol-picker slider. No sync guard needed here:
+    // unlike Length/WordCount, the slider only ever writes into the
+    // textbox (see CustomSeparatorSlider_ValueChanged), never the reverse.
+    private readonly DispatcherTimer _customSeparatorPopupCloseTimer = new() { Interval = TimeSpan.FromMilliseconds(250) };
+
+    // Quick-pick pool for the custom-separator slider - a small,
+    // easy-to-type set, since (unlike the password tab's Symbols pool)
+    // this one gets typed back by a human, often on a different keyboard
+    // layout than it was generated on. Purely a UI convenience: the
+    // generator itself takes CustomSeparator as whatever string the
+    // textbox holds, with no dependency on this pool.
+    private const string CustomSeparatorSymbolPool = "!@#$%^&*-_=+";
+
+    // What the Result card showed for a mode the last time that mode
+    // generated something. Holding one per mode - rather than just
+    // trusting whatever is currently in the shared TextBoxes - is what
+    // lets ModeTabControl_SelectionChanged restore Password's own last
+    // result after the user has since generated a Passphrase (and vice
+    // versa), instead of leaving the other mode's text sitting there.
+    private readonly record struct GenerationResult(string Text, string EntropyText, string SearchSpaceText);
+    private GenerationResult? _passwordResult;
+    private GenerationResult? _passphraseResult;
+
+    private bool IsPassphraseTabActive => ReferenceEquals(ModeTabControl.SelectedItem, PassphraseTabItem);
+
     public MainWindow() {
       InitializeComponent();
       _lengthPopupCloseTimer.Tick += LengthPopupCloseTimer_Tick;
       _wordCountPopupCloseTimer.Tick += WordCountPopupCloseTimer_Tick;
+      _customSeparatorPopupCloseTimer.Tick += CustomSeparatorPopupCloseTimer_Tick;
       _copyConfirmationTimer.Tick += CopyConfirmationTimer_Tick;
       CopyConfirmationPopup.CustomPopupPlacementCallback = GetCopyConfirmationPlacement;
       UpdatePoolSizeDisplay();
+      WordlistSizeTextBlock.Text = CryptoPassphraseGenerator.GetWordlistSize().ToString();
       GeneratePassword();
+    }
+
+    // ComboBoxes on the Passphrase tab route their SelectionChanged up
+    // through the visual tree, so this fires for those too, not just for
+    // an actual tab switch - PassphraseOptionChanged already handles the
+    // ComboBox case, so here we only react when the TabControl itself is
+    // the element whose selection changed.
+    private void ModeTabControl_SelectionChanged(object sender, SelectionChangedEventArgs e) {
+      if (e.OriginalSource != ModeTabControl) {
+        return;
+      }
+
+      var result = IsPassphraseTabActive ? _passphraseResult : _passwordResult;
+      ResultHeaderText.Text = IsPassphraseTabActive ? "Generated Passphrase" : "Generated Password";
+      PasswordTextBox.Text = result?.Text ?? string.Empty;
+      EntropyTextBlock.Text = result?.EntropyText ?? string.Empty;
+      SearchSpaceTextBlock.Text = result?.SearchSpaceText ?? string.Empty;
     }
 
     // Vertically centers the "Copied" toast against CopyButton's actual
@@ -233,17 +278,110 @@ namespace PasswordGenerator {
       _isSyncingWordCount = false;
     }
 
-    // TODO: implement passphrase generation (word source, separator,
-    // capitalization, appended number/symbol). Exists only so the
-    // Passphrase tab's ComboBoxes and CheckBoxes have a handler to bind to
-    // at this layout-only stage - both overloads are intentionally empty.
+    private void CustomSeparatorHoverArea_MouseEnter(object sender, MouseEventArgs e) {
+      _customSeparatorPopupCloseTimer.Stop();
+      CustomSeparatorSliderPopup.IsOpen = true;
+    }
+
+    private void CustomSeparatorHoverArea_MouseLeave(object sender, MouseEventArgs e) {
+      _customSeparatorPopupCloseTimer.Stop();
+      _customSeparatorPopupCloseTimer.Start();
+    }
+
+    private void CustomSeparatorPopupCloseTimer_Tick(object? sender, EventArgs e) {
+      _customSeparatorPopupCloseTimer.Stop();
+      CustomSeparatorSliderPopup.IsOpen = false;
+    }
+
+    private void CustomSeparatorSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e) {
+      CustomSeparatorTextBox.Text = CustomSeparatorSymbolPool[(int)e.NewValue].ToString();
+    }
+
+    // Fires for all four radio buttons in the Separator group. Its only
+    // job is keeping CustomSeparatorTextBox's enabled state in sync with
+    // which one is selected - actual generation reads the selection fresh
+    // from the radio buttons in SelectedSeparator, not from anything
+    // this handler stores.
+    private void SeparatorOptionChanged(object sender, RoutedEventArgs e) {
+      // Guard against InitializeComponent applying the default
+      // IsChecked="True" on SeparatorCustomRadio before CustomSeparatorTextBox
+      // has been assigned yet, same ordering caveat as UpdatePoolSizeDisplay.
+      if (CustomSeparatorTextBox is null) {
+        return;
+      }
+
+      CustomSeparatorTextBox.IsEnabled = SeparatorCustomRadio.IsChecked == true;
+    }
+
+    // Unlike CharacterOptionChanged, these have nothing to do: none of the
+    // Passphrase tab's controls feed a live display the way the character
+    // checkboxes feed PoolSizeTextBlock (WordlistSizeTextBlock reflects the
+    // fixed wordlist, not any option). Actual generation only happens on
+    // Generate, mirroring the Password tab - both overloads stay as
+    // no-op handlers purely so the XAML has something to bind to.
     private void PassphraseOptionChanged(object sender, RoutedEventArgs e) {
     }
 
     private void PassphraseOptionChanged(object sender, SelectionChangedEventArgs e) {
     }
 
-    private void GenerateButton_Click(object sender, RoutedEventArgs e) => GeneratePassword();
+    private void GenerateButton_Click(object sender, RoutedEventArgs e) {
+      if (IsPassphraseTabActive) {
+        GeneratePassphrase();
+      } else {
+        GeneratePassword();
+      }
+    }
+
+    private PassphraseSeparator SelectedSeparator() =>
+        SeparatorCustomRadio.IsChecked == true ? PassphraseSeparator.Custom : PassphraseSeparator.None;
+
+    private PassphraseCapitalization SelectedCapitalization() {
+      if (CapitalizationTitleCaseRadio.IsChecked == true) {
+        return PassphraseCapitalization.TitleCase;
+      }
+
+      if (CapitalizationRandomPerWordRadio.IsChecked == true) {
+        return PassphraseCapitalization.RandomPerWord;
+      }
+
+      return PassphraseCapitalization.None;
+    }
+
+    private void GeneratePassphrase() {
+      var options = new PassphraseOptions {
+        WordCount = (int)WordCountSlider.Value,
+        Separator = SelectedSeparator(),
+        CustomSeparator = CustomSeparatorTextBox.Text,
+        Capitalization = SelectedCapitalization(),
+        AppendNumber = AppendNumberCheckBox.IsChecked == true,
+      };
+
+      try {
+        PasswordTextBox.Text = CryptoPassphraseGenerator.Generate(options);
+
+        if (AutoCopyCheckBox.IsChecked == true) {
+          CopyPasswordToClipboard();
+        }
+
+        // No "X^Y" prefix here the way GeneratePassword shows poolSize^Length:
+        // RandomPerWord and AppendNumber add bits that don't share the
+        // wordlist's base, so unlike the password case there isn't a single
+        // base^exponent that already equals the full entropy -
+        // FormatSearchSpace's derived-from-bits combinations figure is the
+        // only one that stays accurate regardless of which options are on.
+        var bits = CryptoPassphraseGenerator.GetMaximumEntropyBits(options);
+        EntropyTextBlock.Text = $"{bits:F1} bits";
+        SearchSpaceTextBlock.Text = FormatSearchSpace(bits);
+        _passphraseResult = new GenerationResult(PasswordTextBox.Text, EntropyTextBlock.Text, SearchSpaceTextBlock.Text);
+      } catch (PassphraseOptionsException ex) {
+        PasswordTextBox.Text = string.Empty;
+        EntropyTextBlock.Text = string.Empty;
+        SearchSpaceTextBlock.Text = string.Empty;
+        _passphraseResult = null;
+        MessageBox.Show(ex.Message, "Cannot generate passphrase", MessageBoxButton.OK, MessageBoxImage.Warning);
+      }
+    }
 
     private void GeneratePassword() {
       var options = new PasswordOptions {
@@ -270,10 +408,12 @@ namespace PasswordGenerator {
         var poolSize = CryptoPasswordGenerator.GetPoolSize(options);
         EntropyTextBlock.Text = $"{bits:F1} bits";
         SearchSpaceTextBlock.Text = $"{poolSize}^{options.Length} {FormatSearchSpace(bits)}";
+        _passwordResult = new GenerationResult(PasswordTextBox.Text, EntropyTextBlock.Text, SearchSpaceTextBlock.Text);
       } catch (PasswordOptionsException ex) {
         PasswordTextBox.Text = string.Empty;
         EntropyTextBlock.Text = string.Empty;
         SearchSpaceTextBlock.Text = string.Empty;
+        _passwordResult = null;
         MessageBox.Show(ex.Message, "Cannot generate password", MessageBoxButton.OK, MessageBoxImage.Warning);
       }
     }
